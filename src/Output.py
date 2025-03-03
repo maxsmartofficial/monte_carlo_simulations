@@ -1,13 +1,14 @@
-
 class Output:
+    def __init__(self):
+        self.all_simulations = []
+
     def aggregate(self):
-        pass
+        return self.all_simulations
 
     def update(self, value):
-        pass
+        self.all_simulations.append(value)
 
 
 class MeanOutput(Output):
-    pass
-
-
+    def aggregate(self):
+        return sum(self.all_simulations) / len(self.all_simulations)
