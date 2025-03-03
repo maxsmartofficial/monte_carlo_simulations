@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 from src.Simulation import SimulationManager, Simulation
 
 
@@ -17,6 +17,15 @@ class SimulationManagerTest(unittest.TestCase):
         )
         simulation_manager.start(runs=1)
         mock_output.update.assert_called_once_with(10)
+
+    def test_many_simulations_run(self):
+        mock_output = Mock()
+
+        simulation_manager = SimulationManager(
+            input=10, simulation_type=MockSimulation, output=mock_output
+        )
+        simulation_manager.start(runs=5)
+        mock_output.update.assert_has_calls([call(10)] * 5)
 
 
 class SimulationTest(unittest.TestCase):
