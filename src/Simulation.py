@@ -61,51 +61,55 @@ class SimulationManager:
 
         return result
 
+    def reset_state(self):
+        self.result_queue = multiprocessing.Queue()
+        self.simulating_event_flag = multiprocessing.Event()
+        self.is_dispatching = threading.Event()
+
     def start(self, runs=None):
-        result_queue = multiprocessing.Queue()
+        self.reset_state()
         total_runs = multiprocessing.Value("i", runs)
-        simulating_event_flag = multiprocessing.Event()
-        simulating_event_flag.set()
-        processes = []
+        self.simulating_event_flag.set()
+        self.processes = []
 
         for _ in range(
             os.cpu_count()
         ):  # Can be updated to os.process_cpu_count() from 3.13
             process = SimulationProcess(
                 self.input,
-                result_queue,
+                self.result_queue,
                 self.simulation_type,
-                simulating_event_flag,
+                self.simulating_event_flag,
                 total_runs,
             )
-            processes.append(process)
+            self.processes.append(process)
             process.start()
 
-        is_dispatching = threading.Event()
-        is_dispatching.set()
-        dispatcher = ResultDispatcher(result_queue, self.output, is_dispatching)
-        dispatcher.start()
+        self.is_dispatching.set()
+        self.dispatcher = ResultDispatcher(
+            self.result_queue, self.output, self.is_dispatching
+        )
+        self.dispatcher.start()
 
         while True:
-            runs_left = (
-                total_runs.value
-            )  # We don't need a lock, since we just need the value
+            # We don't need a lock, since we just need the value
+            runs_left = total_runs.value
             if runs_left <= 0:
-                # Shut down everything
-                simulating_event_flag.clear()
-                # Check all simulations have finished
-                for p in processes:
-                    p.join()
-                # Check all results have been dispatched
-                result_queue.close()
-                result_queue.join_thread()
-                # Stop the dispatcher
-                is_dispatching.clear()
-                dispatcher.join()
+                self.stop()
                 break
 
     def stop(self):
-        pass
+        # Shut down everything
+        self.simulating_event_flag.clear()
+        # Check all simulations have finished
+        for p in self.processes:
+            p.join()
+        # Check all results have been dispatched
+        self.result_queue.close()
+        self.result_queue.join_thread()
+        # Stop the dispatcher
+        self.is_dispatching.clear()
+        self.dispatcher.join()
 
 
 class Simulation:
