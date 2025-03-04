@@ -25,7 +25,7 @@ class SimulationProcess(multiprocessing.Process):
         result_queue,
         simulation_type,
         simulating,
-        total_runs,
+        total_runs=None,
         *args,
         **kwargs
     ):
@@ -38,11 +38,12 @@ class SimulationProcess(multiprocessing.Process):
 
     def run(self):
         while self.simulating.is_set():
-            with self.total_runs.get_lock():
-                if self.total_runs.value <= 0:
-                    break
-                else:
-                    self.total_runs.value -= 1
+            if self.total_runs is not None:
+                with self.total_runs.get_lock():
+                    if self.total_runs.value <= 0:
+                        break
+                    else:
+                        self.total_runs.value -= 1
 
             simulation = self.simulation_type(self.input)
             result = simulation.start()
@@ -67,36 +68,62 @@ class SimulationManager:
         self.is_dispatching = threading.Event()
 
     def start(self, runs=None):
-        self.reset_state()
-        total_runs = multiprocessing.Value("i", runs)
-        self.simulating_event_flag.set()
-        self.processes = []
+        if runs is None:
+            self.reset_state()
+            total_runs = None
+            self.simulating_event_flag.set()
+            self.processes = []
 
-        for _ in range(
-            os.cpu_count()
-        ):  # Can be updated to os.process_cpu_count() from 3.13
-            process = SimulationProcess(
-                self.input,
-                self.result_queue,
-                self.simulation_type,
-                self.simulating_event_flag,
-                total_runs,
+            for _ in range(
+                os.cpu_count()
+            ):  # Can be updated to os.process_cpu_count() from 3.13
+                process = SimulationProcess(
+                    self.input,
+                    self.result_queue,
+                    self.simulation_type,
+                    self.simulating_event_flag,
+                    total_runs,
+                )
+                self.processes.append(process)
+                process.start()
+
+            self.is_dispatching.set()
+            self.dispatcher = ResultDispatcher(
+                self.result_queue, self.output, self.is_dispatching
             )
-            self.processes.append(process)
-            process.start()
+            self.dispatcher.start()
 
-        self.is_dispatching.set()
-        self.dispatcher = ResultDispatcher(
-            self.result_queue, self.output, self.is_dispatching
-        )
-        self.dispatcher.start()
+        else:
+            self.reset_state()
+            total_runs = multiprocessing.Value("i", runs)
+            self.simulating_event_flag.set()
+            self.processes = []
 
-        while True:
-            # We don't need a lock, since we just need the value
-            runs_left = total_runs.value
-            if runs_left <= 0:
-                self.stop()
-                break
+            for _ in range(
+                os.cpu_count()
+            ):  # Can be updated to os.process_cpu_count() from 3.13
+                process = SimulationProcess(
+                    self.input,
+                    self.result_queue,
+                    self.simulation_type,
+                    self.simulating_event_flag,
+                    total_runs,
+                )
+                self.processes.append(process)
+                process.start()
+
+            self.is_dispatching.set()
+            self.dispatcher = ResultDispatcher(
+                self.result_queue, self.output, self.is_dispatching
+            )
+            self.dispatcher.start()
+
+            while True:
+                # We don't need a lock, since we just need the value
+                runs_left = total_runs.value
+                if runs_left <= 0:
+                    self.stop()
+                    break
 
     def stop(self):
         # Shut down everything
