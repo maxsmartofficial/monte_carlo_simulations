@@ -68,56 +68,33 @@ class SimulationManager:
         self.is_dispatching = threading.Event()
 
     def start(self, runs=None):
+        self.reset_state()
         if runs is None:
-            self.reset_state()
             total_runs = None
-            self.simulating_event_flag.set()
-            self.processes = []
-
-            for _ in range(
-                os.cpu_count()
-            ):  # Can be updated to os.process_cpu_count() from 3.13
-                process = SimulationProcess(
-                    self.input,
-                    self.result_queue,
-                    self.simulation_type,
-                    self.simulating_event_flag,
-                    total_runs,
-                )
-                self.processes.append(process)
-                process.start()
-
-            self.is_dispatching.set()
-            self.dispatcher = ResultDispatcher(
-                self.result_queue, self.output, self.is_dispatching
-            )
-            self.dispatcher.start()
-
         else:
-            self.reset_state()
             total_runs = multiprocessing.Value("i", runs)
-            self.simulating_event_flag.set()
-            self.processes = []
+        self.simulating_event_flag.set()
+        self.processes = []
 
-            for _ in range(
-                os.cpu_count()
-            ):  # Can be updated to os.process_cpu_count() from 3.13
-                process = SimulationProcess(
-                    self.input,
-                    self.result_queue,
-                    self.simulation_type,
-                    self.simulating_event_flag,
-                    total_runs,
-                )
-                self.processes.append(process)
-                process.start()
-
-            self.is_dispatching.set()
-            self.dispatcher = ResultDispatcher(
-                self.result_queue, self.output, self.is_dispatching
+        # Can be updated to os.process_cpu_count() from 3.13
+        for _ in range(os.cpu_count()):
+            process = SimulationProcess(
+                self.input,
+                self.result_queue,
+                self.simulation_type,
+                self.simulating_event_flag,
+                total_runs,
             )
-            self.dispatcher.start()
+            self.processes.append(process)
+            process.start()
 
+        self.is_dispatching.set()
+        self.dispatcher = ResultDispatcher(
+            self.result_queue, self.output, self.is_dispatching
+        )
+        self.dispatcher.start()
+
+        if total_runs is not None:
             while True:
                 # We don't need a lock, since we just need the value
                 runs_left = total_runs.value
