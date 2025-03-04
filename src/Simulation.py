@@ -96,22 +96,17 @@ class SimulationManager:
 
         if total_runs is not None:
             while True:
-                # We don't need a lock, since we just need the value
                 runs_left = total_runs.value
                 if runs_left <= 0:
                     self.stop()
                     break
 
     def stop(self):
-        # Shut down everything
         self.simulating_event_flag.clear()
-        # Check all simulations have finished
         for p in self.processes:
             p.join()
-        # Check all results have been dispatched
         self.result_queue.close()
         self.result_queue.join_thread()
-        # Stop the dispatcher
         self.is_dispatching.clear()
         self.dispatcher.join()
 
