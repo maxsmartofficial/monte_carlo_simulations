@@ -105,9 +105,9 @@ class SimulationManager:
         self.simulating_event_flag.clear()
         for p in self.processes:
             p.join()
+        self.is_dispatching.clear()
         self.result_queue.close()
         self.result_queue.join_thread()
-        self.is_dispatching.clear()
         self.dispatcher.join()
 
 
