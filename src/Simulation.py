@@ -3,6 +3,10 @@ import threading
 import os
 
 
+class ResultBatch:
+    pass
+
+
 class ResultDispatcher(threading.Thread):
     def __init__(self, result_queue, output, is_dispatching, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -51,7 +55,7 @@ class SimulationProcess(multiprocessing.Process):
 
 
 class SimulationManager:
-    def __init__(self, input, simulation_type, output):
+    def __init__(self, input, simulation_type, output, batching=True):
         self.input = input
         self.simulation_type = simulation_type
         self.output = output
