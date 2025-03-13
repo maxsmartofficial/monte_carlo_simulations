@@ -48,25 +48,34 @@ class SimulationProcess(multiprocessing.Process):
 
         self.batch = []
 
+    def process_result(self, result):
+        if not self.batching:
+            self.result_queue.put(result)
+        self.batch.append(result)
+        if len(self.batch) == self.batch_size:
+            batch = ResultBatch(self.batch)
+            self.result_queue.put(batch)
+            self.batch = []
+
+    def more_simulations_required(self) -> bool:
+        if self.total_runs is None:
+            return True
+        with self.total_runs.get_lock():
+            if self.total_runs.value <= 0:
+                return False
+            else:
+                self.total_runs.value -= 1
+                return True
+
     def run(self):
         while self.simulating.is_set():
-            if self.total_runs is not None:
-                with self.total_runs.get_lock():
-                    if self.total_runs.value <= 0:
-                        break
-                    else:
-                        self.total_runs.value -= 1
+            if not self.more_simulations_required():
+                break
 
             simulation = self.simulation_type(self.input)
             result = simulation.start()
-            if self.batching:
-                self.batch.append(result)
-                if len(self.batch) == self.batch_size:
-                    batch = ResultBatch(self.batch)
-                    self.result_queue.put(batch)
-                    self.batch = []
-            else:
-                self.result_queue.put(result)
+
+            self.process_result(result)
 
 
 class SimulationManager:
