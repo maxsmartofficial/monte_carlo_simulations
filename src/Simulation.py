@@ -1,6 +1,12 @@
 import multiprocessing
 import threading
 import os
+from dataclasses import dataclass
+
+
+@dataclass
+class ResultBatch:
+    batch: list
 
 
 class ResultDispatcher(threading.Thread):
@@ -19,6 +25,8 @@ class ResultDispatcher(threading.Thread):
 
 
 class SimulationProcess(multiprocessing.Process):
+    batch_size = 10
+
     def __init__(
         self,
         input,
@@ -26,6 +34,7 @@ class SimulationProcess(multiprocessing.Process):
         simulation_type,
         simulating,
         total_runs=None,
+        batching=False,
         *args,
         **kwargs
     ):
@@ -35,26 +44,46 @@ class SimulationProcess(multiprocessing.Process):
         self.simulation_type = simulation_type
         self.simulating = simulating
         self.total_runs = total_runs
+        self.batching = batching
+
+        self.batch = []
+
+    def process_result(self, result):
+        if not self.batching:
+            self.result_queue.put(result)
+        self.batch.append(result)
+        if len(self.batch) == self.batch_size:
+            batch = ResultBatch(self.batch)
+            self.result_queue.put(batch)
+            self.batch = []
+
+    def more_simulations_required(self) -> bool:
+        if self.total_runs is None:
+            return True
+        with self.total_runs.get_lock():
+            if self.total_runs.value <= 0:
+                return False
+            else:
+                self.total_runs.value -= 1
+                return True
 
     def run(self):
         while self.simulating.is_set():
-            if self.total_runs is not None:
-                with self.total_runs.get_lock():
-                    if self.total_runs.value <= 0:
-                        break
-                    else:
-                        self.total_runs.value -= 1
+            if not self.more_simulations_required():
+                break
 
             simulation = self.simulation_type(self.input)
             result = simulation.start()
-            self.result_queue.put(result)
+
+            self.process_result(result)
 
 
 class SimulationManager:
-    def __init__(self, input, simulation_type, output):
+    def __init__(self, input, simulation_type, output, batching=True):
         self.input = input
         self.simulation_type = simulation_type
         self.output = output
+        self.batching = batching
 
     def _run_simulation_process(self):
         simulation = Simulation(self.input)
@@ -84,6 +113,7 @@ class SimulationManager:
                 self.simulation_type,
                 self.simulating_event_flag,
                 total_runs,
+                batching=self.batching,
             )
             self.processes.append(process)
             process.start()
@@ -106,9 +136,9 @@ class SimulationManager:
         for p in self.processes:
             p.join()
         self.is_dispatching.clear()
+        self.dispatcher.join()
         self.result_queue.close()
         self.result_queue.join_thread()
-        self.dispatcher.join()
 
 
 class Simulation:
