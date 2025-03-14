@@ -1,3 +1,6 @@
+from .ResultBatch import ResultBatch
+
+
 class Output:
     def __init__(self):
         self.all_simulations = []
@@ -6,7 +9,10 @@ class Output:
         return self.all_simulations
 
     def update(self, value):
-        self.all_simulations.append(value)
+        if isinstance(value, ResultBatch):
+            self.all_simulations += value.batch
+        else:
+            self.all_simulations.append(value)
 
 
 class MeanOutput(Output):
