@@ -66,11 +66,16 @@ class SimulationProcess(multiprocessing.Process):
         while self.simulating.is_set():
             if not self.more_simulations_required():
                 break
-
             simulation = self.simulation_type(self.input)
             result = simulation.start()
 
             self.process_result(result)
+
+    def get_average_simulation_time(self):
+        pass
+
+    def get_average_aggregation_time(self):
+        pass
 
 
 class SimulationManager:
