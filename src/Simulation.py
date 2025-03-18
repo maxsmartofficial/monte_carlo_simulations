@@ -21,8 +21,6 @@ class ResultDispatcher(threading.Thread):
 
 
 class SimulationProcess(multiprocessing.Process):
-    batch_size = 10
-
     def __init__(
         self,
         input,
@@ -49,10 +47,12 @@ class SimulationProcess(multiprocessing.Process):
         self.aggregation_time_sum = 0
         self.total_aggregations = 0
 
+        self.batch_size_cache = None
+
     def process_result(self, result):
         if self.batching:
             self.batch.append(result)
-            if len(self.batch) == self.batch_size:
+            if len(self.batch) == self.get_batch_size():
                 batch = ResultBatch(self.batch)
                 start = time.perf_counter()
                 self.result_queue.put(batch)
@@ -60,6 +60,7 @@ class SimulationProcess(multiprocessing.Process):
                 self.aggregation_time_sum += end - start
                 self.total_aggregations += 1
                 self.batch = []
+                self.recalculate_batch_size()
         else:
             start = time.perf_counter()
             self.result_queue.put(result)
@@ -102,8 +103,20 @@ class SimulationProcess(multiprocessing.Process):
         else:
             return self.aggregation_time_sum / self.total_aggregations
 
+    def recalculate_batch_size(self):
+        avg_simulation_time = self.get_average_simulation_time()
+        avg_aggregation_time = self.get_average_aggregation_time()
+        max_batch_size = (avg_aggregation_time / avg_simulation_time) * (
+            self.total_simulations
+        ) ** 0.5
+        batch_size = max(1, min(max_batch_size, self.total_simulations))
+        self.batch_size_cache = batch_size
+
     def get_batch_size(self):
-        pass
+        if self.batch_size_cache is None:
+            self.recalculate_batch_size()
+
+        return self.batch_size_cache
 
 
 class SimulationManager:

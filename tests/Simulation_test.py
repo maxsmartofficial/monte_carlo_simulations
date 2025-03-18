@@ -67,7 +67,7 @@ class SimulationManagerTest(unittest.TestCase):
         simulation_manager = SimulationManager(
             input=10, simulation_type=MockSimulation, output=mock_output
         )
-        simulation_manager.start(runs=200)
+        simulation_manager.start(runs=2000)
         first_output = mock_output.update.call_args_list[0]
         self.assertIsInstance(first_output[0][0], ResultBatch)
 
