@@ -50,21 +50,22 @@ class SimulationProcess(multiprocessing.Process):
         self.total_aggregations = 0
 
     def process_result(self, result):
-        if not self.batching:
+        if self.batching:
+            self.batch.append(result)
+            if len(self.batch) == self.batch_size:
+                batch = ResultBatch(self.batch)
+                start = time.perf_counter()
+                self.result_queue.put(batch)
+                end = time.perf_counter()
+                self.aggregation_time_sum += end - start
+                self.total_aggregations += 1
+                self.batch = []
+        else:
             start = time.perf_counter()
             self.result_queue.put(result)
             end = time.perf_counter()
             self.aggregation_time_sum += end - start
             self.total_aggregations += 1
-        self.batch.append(result)
-        if len(self.batch) == self.batch_size:
-            batch = ResultBatch(self.batch)
-            start = time.perf_counter()
-            self.result_queue.put(batch)
-            end = time.perf_counter()
-            self.aggregation_time_sum += end - start
-            self.total_aggregations += 1
-            self.batch = []
 
     def more_simulations_required(self) -> bool:
         if self.total_runs is None:
