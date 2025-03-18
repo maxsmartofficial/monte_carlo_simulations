@@ -82,11 +82,11 @@ class SimulationTest(unittest.TestCase):
 class SimulationProcessTest(unittest.TestCase):
     def test_average_simulation_time(self):
         mock_perf_counter = MockPerfCounter()
+        result_queue = Mock()
+        mock_simulating = Mock()
+        mock_simulating.is_set.return_value = True
+        mock_value = Value("i", 2)
         with patch("src.Simulation.time.perf_counter", mock_perf_counter.perf_counter):
-            result_queue = Mock()
-            mock_simulating = Mock()
-            mock_simulating.is_set.return_value = True
-            mock_value = Value("i", 2)
             simulation_process = SimulationProcess(
                 input=10,
                 result_queue=result_queue,
@@ -98,8 +98,26 @@ class SimulationProcessTest(unittest.TestCase):
             simulation_process.run()
 
             avg_simulation_time = simulation_process.get_average_simulation_time()
-            avg_aggregation_time = simulation_process.get_average_aggregation_time()
             self.assertEqual(avg_simulation_time, 1)
+
+    def test_average_aggregation_time(self):
+        mock_perf_counter = MockPerfCounter()
+        result_queue = Mock()
+        mock_simulating = Mock()
+        mock_simulating.is_set.return_value = True
+        mock_value = Value("i", 2)
+        with patch("src.Simulation.time.perf_counter", mock_perf_counter.perf_counter):
+            simulation_process = SimulationProcess(
+                input=10,
+                result_queue=result_queue,
+                simulation_type=MockSimulation,
+                simulating=mock_simulating,
+                total_runs=mock_value,
+                batching=True,
+            )
+            simulation_process.run()
+
+            avg_aggregation_time = simulation_process.get_average_aggregation_time()
             self.assertEqual(avg_aggregation_time, 1)
 
 
