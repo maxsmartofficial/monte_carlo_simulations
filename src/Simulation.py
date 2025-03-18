@@ -2,6 +2,7 @@ import multiprocessing
 import threading
 import os
 from .ResultBatch import ResultBatch
+import time
 
 
 class ResultDispatcher(threading.Thread):
@@ -43,13 +44,26 @@ class SimulationProcess(multiprocessing.Process):
 
         self.batch = []
 
+        self.simulation_time_sum = 0
+        self.total_simulations = 0
+        self.aggregation_time_sum = 0
+        self.total_aggregations = 0
+
     def process_result(self, result):
         if not self.batching:
+            start = time.perf_counter()
             self.result_queue.put(result)
+            end = time.perf_counter()
+            self.aggregation_time_sum += end - start
+            self.total_aggregations += 1
         self.batch.append(result)
         if len(self.batch) == self.batch_size:
             batch = ResultBatch(self.batch)
+            start = time.perf_counter()
             self.result_queue.put(batch)
+            end = time.perf_counter()
+            self.aggregation_time_sum += end - start
+            self.total_aggregations += 1
             self.batch = []
 
     def more_simulations_required(self) -> bool:
@@ -67,15 +81,25 @@ class SimulationProcess(multiprocessing.Process):
             if not self.more_simulations_required():
                 break
             simulation = self.simulation_type(self.input)
+            start = time.perf_counter()
             result = simulation.start()
+            end = time.perf_counter()
+            self.simulation_time_sum += end - start
+            self.total_simulations += 1
 
             self.process_result(result)
 
     def get_average_simulation_time(self):
-        pass
+        if self.total_simulations == 0:
+            return 0
+        else:
+            return self.simulation_time_sum / self.total_simulations
 
     def get_average_aggregation_time(self):
-        pass
+        if self.total_aggregations == 0:
+            return 0
+        else:
+            return self.aggregation_time_sum / self.total_aggregations
 
 
 class SimulationManager:

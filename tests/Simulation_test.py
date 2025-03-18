@@ -93,7 +93,7 @@ class SimulationProcessTest(unittest.TestCase):
                 simulation_type=MockSimulation,
                 simulating=mock_simulating,
                 total_runs=mock_value,
-                batching=True,
+                batching=False,
             )
             simulation_process.run()
 
@@ -113,7 +113,7 @@ class SimulationProcessTest(unittest.TestCase):
                 simulation_type=MockSimulation,
                 simulating=mock_simulating,
                 total_runs=mock_value,
-                batching=True,
+                batching=False,
             )
             simulation_process.run()
 
