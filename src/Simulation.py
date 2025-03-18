@@ -1,12 +1,8 @@
 import multiprocessing
 import threading
 import os
-from dataclasses import dataclass
-
-
-@dataclass
-class ResultBatch:
-    batch: list
+from .ResultBatch import ResultBatch
+import time
 
 
 class ResultDispatcher(threading.Thread):
@@ -25,8 +21,6 @@ class ResultDispatcher(threading.Thread):
 
 
 class SimulationProcess(multiprocessing.Process):
-    batch_size = 10
-
     def __init__(
         self,
         input,
@@ -48,14 +42,31 @@ class SimulationProcess(multiprocessing.Process):
 
         self.batch = []
 
+        self.simulation_time_sum = 0
+        self.total_simulations = 0
+        self.aggregation_time_sum = 0
+        self.total_aggregations = 0
+
+        self.batch_size_cache = None
+
     def process_result(self, result):
-        if not self.batching:
+        if self.batching:
+            self.batch.append(result)
+            if len(self.batch) == self.get_batch_size():
+                batch = ResultBatch(self.batch)
+                start = time.perf_counter()
+                self.result_queue.put(batch)
+                end = time.perf_counter()
+                self.aggregation_time_sum += end - start
+                self.total_aggregations += 1
+                self.batch = []
+                self.recalculate_batch_size()
+        else:
+            start = time.perf_counter()
             self.result_queue.put(result)
-        self.batch.append(result)
-        if len(self.batch) == self.batch_size:
-            batch = ResultBatch(self.batch)
-            self.result_queue.put(batch)
-            self.batch = []
+            end = time.perf_counter()
+            self.aggregation_time_sum += end - start
+            self.total_aggregations += 1
 
     def more_simulations_required(self) -> bool:
         if self.total_runs is None:
@@ -71,11 +82,41 @@ class SimulationProcess(multiprocessing.Process):
         while self.simulating.is_set():
             if not self.more_simulations_required():
                 break
-
             simulation = self.simulation_type(self.input)
+            start = time.perf_counter()
             result = simulation.start()
+            end = time.perf_counter()
+            self.simulation_time_sum += end - start
+            self.total_simulations += 1
 
             self.process_result(result)
+
+    def get_average_simulation_time(self):
+        if self.total_simulations == 0:
+            return 0
+        else:
+            return self.simulation_time_sum / self.total_simulations
+
+    def get_average_aggregation_time(self):
+        if self.total_aggregations == 0:
+            return 0
+        else:
+            return self.aggregation_time_sum / self.total_aggregations
+
+    def recalculate_batch_size(self):
+        avg_simulation_time = self.get_average_simulation_time()
+        avg_aggregation_time = self.get_average_aggregation_time()
+        max_batch_size = (avg_aggregation_time / avg_simulation_time) * (
+            self.total_simulations
+        ) ** 0.5
+        batch_size = max(1, min(max_batch_size, self.total_simulations))
+        self.batch_size_cache = batch_size
+
+    def get_batch_size(self):
+        if self.batch_size_cache is None:
+            self.recalculate_batch_size()
+
+        return self.batch_size_cache
 
 
 class SimulationManager:

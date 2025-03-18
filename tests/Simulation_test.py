@@ -1,7 +1,8 @@
 import unittest
-from unittest.mock import Mock, call
-from src.Simulation import SimulationManager, Simulation, ResultBatch
+from unittest.mock import Mock, call, patch
+from src.Simulation import SimulationManager, Simulation, SimulationProcess, ResultBatch
 from threading import Event
+from multiprocessing import Value
 
 
 class MockSimulation(Simulation):
@@ -19,6 +20,15 @@ class MockCounterOutput:
         self.counter += 1
         if self.counter == self.limit:
             self.limit_flag.set()
+
+
+class MockPerfCounter:
+    def __init__(self):
+        self.start = 0
+
+    def perf_counter(self):
+        self.start += 1
+        return self.start
 
 
 class SimulationManagerTest(unittest.TestCase):
@@ -57,7 +67,7 @@ class SimulationManagerTest(unittest.TestCase):
         simulation_manager = SimulationManager(
             input=10, simulation_type=MockSimulation, output=mock_output
         )
-        simulation_manager.start(runs=200)
+        simulation_manager.start(runs=2000)
         first_output = mock_output.update.call_args_list[0]
         self.assertIsInstance(first_output[0][0], ResultBatch)
 
@@ -67,6 +77,73 @@ class SimulationTest(unittest.TestCase):
         simulation = MockSimulation(input=10)
         result = simulation.start()
         self.assertEqual(result, 10)
+
+
+class SimulationProcessTest(unittest.TestCase):
+    def test_average_simulation_time(self):
+        mock_perf_counter = MockPerfCounter()
+        result_queue = Mock()
+        mock_simulating = Mock()
+        mock_simulating.is_set.return_value = True
+        mock_value = Value("i", 2)
+        with patch("src.Simulation.time.perf_counter", mock_perf_counter.perf_counter):
+            simulation_process = SimulationProcess(
+                input=10,
+                result_queue=result_queue,
+                simulation_type=MockSimulation,
+                simulating=mock_simulating,
+                total_runs=mock_value,
+                batching=False,
+            )
+            simulation_process.run()
+
+            avg_simulation_time = simulation_process.get_average_simulation_time()
+            self.assertEqual(avg_simulation_time, 1)
+
+    def test_average_aggregation_time(self):
+        mock_perf_counter = MockPerfCounter()
+        result_queue = Mock()
+        mock_simulating = Mock()
+        mock_simulating.is_set.return_value = True
+        mock_value = Value("i", 2)
+        with patch("src.Simulation.time.perf_counter", mock_perf_counter.perf_counter):
+            simulation_process = SimulationProcess(
+                input=10,
+                result_queue=result_queue,
+                simulation_type=MockSimulation,
+                simulating=mock_simulating,
+                total_runs=mock_value,
+                batching=False,
+            )
+            simulation_process.run()
+
+            avg_aggregation_time = simulation_process.get_average_aggregation_time()
+            self.assertEqual(avg_aggregation_time, 1)
+
+    def test_get_batch_size(self):
+        result_queue = Mock()
+        mock_simulating = Mock()
+        mock_simulating.is_set.return_value = True
+        mock_value = Value("i", 2)
+        simulation_process = SimulationProcess(
+            input=10,
+            result_queue=result_queue,
+            simulation_type=MockSimulation,
+            simulating=mock_simulating,
+            total_runs=mock_value,
+            batching=False,
+        )
+        get_average_simulation_time = Mock()
+        get_average_simulation_time.return_value = 5
+        simulation_process.get_average_simulation_time = get_average_simulation_time
+        get_average_aggregation_time = Mock()
+        get_average_aggregation_time.return_value = 8
+        simulation_process.get_average_aggregation_time = get_average_aggregation_time
+
+        simulation_process.total_simulations = 100
+        # max(1, A/S * sqrt(n))
+        batch_size = simulation_process.get_batch_size()
+        self.assertEqual(batch_size, 16)
 
 
 if __name__ == "__main__":
