@@ -102,6 +102,9 @@ class SimulationProcess(multiprocessing.Process):
         else:
             return self.aggregation_time_sum / self.total_aggregations
 
+    def get_batch_size(self):
+        pass
+
 
 class SimulationManager:
     def __init__(self, input, simulation_type, output, batching=True):

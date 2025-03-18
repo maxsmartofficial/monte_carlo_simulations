@@ -120,6 +120,31 @@ class SimulationProcessTest(unittest.TestCase):
             avg_aggregation_time = simulation_process.get_average_aggregation_time()
             self.assertEqual(avg_aggregation_time, 1)
 
+    def test_get_batch_size(self):
+        result_queue = Mock()
+        mock_simulating = Mock()
+        mock_simulating.is_set.return_value = True
+        mock_value = Value("i", 2)
+        simulation_process = SimulationProcess(
+            input=10,
+            result_queue=result_queue,
+            simulation_type=MockSimulation,
+            simulating=mock_simulating,
+            total_runs=mock_value,
+            batching=False,
+        )
+        get_average_simulation_time = Mock()
+        get_average_simulation_time.return_value = 5
+        simulation_process.get_average_simulation_time = get_average_simulation_time
+        get_average_aggregation_time = Mock()
+        get_average_aggregation_time.return_value = 8
+        simulation_process.get_average_aggregation_time = get_average_aggregation_time
+
+        simulation_process.total_simulations = 100
+        # max(1, A/S * sqrt(n))
+        batch_size = simulation_process.get_batch_size()
+        self.assertEqual(batch_size, 16)
+
 
 if __name__ == "__main__":
     unittest.main()
