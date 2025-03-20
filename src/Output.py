@@ -1,14 +1,15 @@
 from .ResultBatch import ResultBatch
+from typing import Any
 
 
 class Output:
     def __init__(self):
         self.all_simulations = []
 
-    def aggregate(self):
+    def aggregate(self) -> list[Any]:
         return self.all_simulations
 
-    def update(self, value):
+    def update(self, value: Any | ResultBatch):
         if isinstance(value, ResultBatch):
             self.all_simulations += value.batch
         else:
@@ -16,5 +17,5 @@ class Output:
 
 
 class MeanOutput(Output):
-    def aggregate(self):
+    def aggregate(self) -> float:
         return sum(self.all_simulations) / len(self.all_simulations)

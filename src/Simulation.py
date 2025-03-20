@@ -3,10 +3,19 @@ import threading
 import os
 from .ResultBatch import ResultBatch
 import time
+from .Output import Output
+from typing import Any, Optional
 
 
 class ResultDispatcher(threading.Thread):
-    def __init__(self, result_queue, output, is_dispatching, *args, **kwargs):
+    def __init__(
+        self,
+        result_queue: multiprocessing.Queue,
+        output: Output,
+        is_dispatching: threading.Event,
+        *args,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.result_queue = result_queue
         self.output = output
@@ -23,12 +32,12 @@ class ResultDispatcher(threading.Thread):
 class SimulationProcess(multiprocessing.Process):
     def __init__(
         self,
-        input,
-        result_queue,
-        simulation_type,
-        simulating,
-        total_runs=None,
-        batching=False,
+        input: int,
+        result_queue: multiprocessing.Queue,
+        simulation_type: type,
+        simulating: multiprocessing.Event,
+        total_runs: Optional[multiprocessing.Value] = None,
+        batching: bool = False,
         *args,
         **kwargs
     ):
@@ -49,7 +58,7 @@ class SimulationProcess(multiprocessing.Process):
 
         self.batch_size_cache = None
 
-    def process_result(self, result):
+    def process_result(self, result: Any | ResultBatch) -> None:
         if self.batching:
             self.batch.append(result)
             if len(self.batch) == self.get_batch_size():
@@ -78,7 +87,7 @@ class SimulationProcess(multiprocessing.Process):
                 self.total_runs.value -= 1
                 return True
 
-    def run(self):
+    def run(self) -> None:
         while self.simulating.is_set():
             if not self.more_simulations_required():
                 break
@@ -91,19 +100,19 @@ class SimulationProcess(multiprocessing.Process):
 
             self.process_result(result)
 
-    def get_average_simulation_time(self):
+    def get_average_simulation_time(self) -> float:
         if self.total_simulations == 0:
             return 0
         else:
             return self.simulation_time_sum / self.total_simulations
 
-    def get_average_aggregation_time(self):
+    def get_average_aggregation_time(self) -> float:
         if self.total_aggregations == 0:
             return 0
         else:
             return self.aggregation_time_sum / self.total_aggregations
 
-    def recalculate_batch_size(self):
+    def recalculate_batch_size(self) -> None:
         avg_simulation_time = self.get_average_simulation_time()
         avg_aggregation_time = self.get_average_aggregation_time()
         max_batch_size = (avg_aggregation_time / avg_simulation_time) * (
@@ -112,7 +121,7 @@ class SimulationProcess(multiprocessing.Process):
         batch_size = max(1, min(max_batch_size, self.total_simulations))
         self.batch_size_cache = batch_size
 
-    def get_batch_size(self):
+    def get_batch_size(self) -> int:
         if self.batch_size_cache is None:
             self.recalculate_batch_size()
 
@@ -120,24 +129,26 @@ class SimulationProcess(multiprocessing.Process):
 
 
 class SimulationManager:
-    def __init__(self, input, simulation_type, output, batching=True):
+    def __init__(
+        self, input: int, simulation_type: type, output: Output, batching: bool = True
+    ):
         self.input = input
         self.simulation_type = simulation_type
         self.output = output
         self.batching = batching
 
-    def _run_simulation_process(self):
+    def _run_simulation_process(self) -> Any:
         simulation = Simulation(self.input)
         result = simulation.start()
 
         return result
 
-    def reset_state(self):
+    def reset_state(self) -> None:
         self.result_queue = multiprocessing.Queue()
         self.simulating_event_flag = multiprocessing.Event()
         self.is_dispatching = threading.Event()
 
-    def start(self, runs=None):
+    def start(self, runs: Optional[int] = None) -> None:
         self.reset_state()
         if runs is None:
             total_runs = None
@@ -172,7 +183,7 @@ class SimulationManager:
                     self.stop()
                     break
 
-    def stop(self):
+    def stop(self) -> None:
         self.simulating_event_flag.clear()
         for p in self.processes:
             p.join()
@@ -183,12 +194,12 @@ class SimulationManager:
 
 
 class Simulation:
-    def __init__(self, input):
+    def __init__(self, input: int):
         self.input = input
 
-    def run(self, *args, **kwargs):
+    def run(self, *args, **kwargs) -> int:
         pass
 
-    def start(self):
+    def start(self) -> Any:
         result = self.run()
         return result
