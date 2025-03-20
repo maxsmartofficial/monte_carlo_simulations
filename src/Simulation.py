@@ -137,12 +137,6 @@ class SimulationManager:
         self.output = output
         self.batching = batching
 
-    def _run_simulation_process(self) -> Any:
-        simulation = Simulation(self.input)
-        result = simulation.start()
-
-        return result
-
     def reset_state(self) -> None:
         self.result_queue = multiprocessing.Queue()
         self.simulating_event_flag = multiprocessing.Event()
