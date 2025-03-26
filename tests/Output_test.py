@@ -4,8 +4,6 @@ from src.ResultBatch import ResultBatch
 
 
 class OutputTest(unittest.TestCase):
-    pass
-
     # You can update the output and get the aggregate
     def test_get_aggregate(self):
         output = MeanOutput()
