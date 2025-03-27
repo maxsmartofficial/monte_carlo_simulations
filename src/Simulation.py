@@ -1,10 +1,17 @@
 import multiprocessing
 import threading
 import os
-from .ResultBatch import ResultBatch
+
+# from .ResultBatch import ResultBatch
 import time
 from .Output import Output
 from typing import Any, Optional
+from dataclasses import dataclass
+
+
+@dataclass
+class ResultBatch:
+    batch: list
 
 
 class ResultDispatcher(threading.Thread):
