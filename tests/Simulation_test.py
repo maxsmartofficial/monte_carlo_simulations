@@ -36,10 +36,10 @@ class SimulationManagerTest(unittest.TestCase):
         mock_output = Mock()
 
         simulation_manager = SimulationManager(
-            input=10, simulation_type=MockSimulation, output=mock_output, batching=False
+            input=10, simulation_type=MockSimulation, output=mock_output
         )
         simulation_manager.start(runs=1)
-        mock_output.update.assert_called_once_with(10)
+        mock_output.update.assert_called_once_with(ResultBatch(10, [10]))
 
     def test_many_simulations_run(self):
         mock_output = Mock()
@@ -48,7 +48,9 @@ class SimulationManagerTest(unittest.TestCase):
             input=10, simulation_type=MockSimulation, output=mock_output, batching=False
         )
         simulation_manager.start(runs=5)
-        self.assertEqual(mock_output.update.call_args_list, [call(10)] * 5)
+        self.assertEqual(
+            mock_output.update.call_args_list, [call(ResultBatch(10, [10]))] * 5
+        )
 
     def test_run_indefinitely(self):
         done = Event()
@@ -70,6 +72,19 @@ class SimulationManagerTest(unittest.TestCase):
         simulation_manager.start(runs=2000)
         first_output = mock_output.update.call_args_list[0]
         self.assertIsInstance(first_output[0][0], ResultBatch)
+
+    def test_update_input(self):
+        mock_output = Mock()
+        simulation_manager = SimulationManager(
+            input=10, simulation_type=MockSimulation, output=mock_output
+        )
+        simulation_manager.start(runs=1)
+        first_result_batch = mock_output.update.call_args_list[0][0][0]
+        self.assertEqual(first_result_batch.input, 10)
+        simulation_manager.update_input(11)
+        simulation_manager.start(runs=1)
+        first_result_batch = mock_output.update.call_args_list[1][0][0]
+        self.assertEqual(first_result_batch.input, 11)
 
 
 class SimulationTest(unittest.TestCase):
