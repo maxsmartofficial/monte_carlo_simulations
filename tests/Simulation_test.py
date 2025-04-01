@@ -71,6 +71,23 @@ class SimulationManagerTest(unittest.TestCase):
         first_output = mock_output.update.call_args_list[0]
         self.assertIsInstance(first_output[0][0], ResultBatch)
 
+    def test_update_input(self):
+        # Set up simulation manager as normal
+        # Check we get the thing
+        # Update input
+        # Check we get the other thing
+        mock_output = Mock()
+        simulation_manager = SimulationManager(
+            input=10, simulation_type=MockSimulation, output=mock_output
+        )
+        simulation_manager.start(runs=1)
+        first_result_batch = mock_output.update.call_args_list[0][0][0]
+        self.assertEqual(first_result_batch.input, 10)
+        simulation_manager.update_input(11)
+        simulation_manager.start(runs=1)
+        first_result_batch = mock_output.update.call_args_list[1][0][0]
+        self.assertEqual(first_result_batch.input, 11)
+
 
 class SimulationTest(unittest.TestCase):
     def test_simulation_writes_to_queue(self):
