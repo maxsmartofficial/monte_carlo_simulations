@@ -73,7 +73,7 @@ class SimulationProcess(multiprocessing.Process):
                 self.recalculate_batch_size()
         else:
             start = time.perf_counter()
-            self.result_queue.put(result)
+            self.result_queue.put(ResultBatch(self.input, [result]))
             end = time.perf_counter()
             self.aggregation_time_sum += end - start
             self.total_aggregations += 1
@@ -133,6 +133,9 @@ class SimulationManager:
     def __init__(
         self, input: int, simulation_type: type, output: Output, batching: bool = True
     ):
+        """
+        batching: whether batches are dynamically resized (otherwise batch size is 1)
+        """
         self.input = input
         self.simulation_type = simulation_type
         self.output = output
