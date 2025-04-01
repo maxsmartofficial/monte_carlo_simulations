@@ -2,16 +2,10 @@ import multiprocessing
 import threading
 import os
 
-# from .ResultBatch import ResultBatch
+from .ResultBatch import ResultBatch
 import time
 from .Output import Output
 from typing import Any, Optional
-from dataclasses import dataclass
-
-
-@dataclass
-class ResultBatch:
-    batch: list
 
 
 class ResultDispatcher(threading.Thread):
@@ -69,7 +63,7 @@ class SimulationProcess(multiprocessing.Process):
         if self.batching:
             self.batch.append(result)
             if len(self.batch) == self.get_batch_size():
-                batch = ResultBatch(self.batch)
+                batch = ResultBatch(self.input, self.batch)
                 start = time.perf_counter()
                 self.result_queue.put(batch)
                 end = time.perf_counter()
@@ -192,6 +186,9 @@ class SimulationManager:
         self.dispatcher.join()
         self.result_queue.close()
         self.result_queue.join_thread()
+
+    def update_input(self, input) -> None:
+        self.input = input
 
 
 class Simulation:
